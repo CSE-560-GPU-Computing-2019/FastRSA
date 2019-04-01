@@ -98,7 +98,7 @@ __global__ void rsa( int *num, int *key, int *den, unsigned int *result)
 int main(){
 	int nsize = 5;
 	int num[5] = {104,101, 108, 108, 111};
-	int key = 6558;
+	int key = 2000;
 	int size = key / 2;
 	int den = 91 * 97;
 	int *d_num, *d_key, *d_den;
