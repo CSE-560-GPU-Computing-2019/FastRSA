@@ -50,8 +50,7 @@ __global__ void parallel_reduction(int *array, int *output, int mod)
 		if ( tid % ( 2 * s  ) == 0  ){
 			if ( tid + s < blockDim.x ){
 				array[tid] = ( (array[tid]  % mod  ) * (array[ tid + s ] % mod ) )% mod;
-
-			}
+}
 		}
 		__syncthreads();
 		//printf("%d;%d\n", array[tid], tid);
@@ -68,7 +67,6 @@ __global__ void parallel_reduction(int *array, int *output, int mod)
 	}
 	*/
 	if (tid == 0){
-		//printf(  "%d\n", array[0]  );
 		output[blockIdx.x] = array[0];
 	}
 }
@@ -98,7 +96,7 @@ __global__ void rsa( int *num, int *key, int *den, unsigned int *result)
 int main(){
 	int nsize = 5;
 	int num[5] = {104,101, 108, 108, 111};
-	int key = 2000;
+	int key = 12000;
 	int size = key / 2;
 	int den = 91 * 97;
 	int *d_num, *d_key, *d_den;
@@ -165,11 +163,17 @@ int main(){
 	
 	cudaEventDestroy (start_p);
 	cudaEventDestroy (stop_p);
-
-	cudaMemcpy( ans, input, size * sizeof(int), cudaMemcpyDeviceToHost);
 	
- 
-	printf("%d - %d\n", ans[0], res[0] );
+	cudaDeviceSynchronize();
+
+	cudaMemcpy( ans, output, size * sizeof(int), cudaMemcpyDeviceToHost);
+	
+	int final_ans = ans[0];
+	for (int i = 1;i < num_blocks;i++){
+		final_ans = ( (final_ans % den) * (ans[i] % den ) ) % den;
+	}
+	
+	printf("%d -  %d\n", final_ans, res[0] );
 	cudaFree(d_num);
 	cudaFree(d_key);
 	cudaFree(d_den);
