@@ -8,8 +8,7 @@ __device__ long long int mod(int base, int exponent, int den)
 	// unsigned int a = base * base;
 	unsigned long long int ret = 1;
 	float size = (float) exponent / 2;
-	if (  exponent == 0 )
-	{
+	if (  exponent == 0 ) {
 		return base % den;
 	}
 	else
@@ -38,37 +37,60 @@ __device__ long long int mod(int base, int exponent, int den)
 
 __global__ void parallel_reduction(int *array, int *output, int mod)
 {
-	//extern __shared__ int sdata[];
+	extern __shared__ int sdata[];
 	int tid = threadIdx.x;
-	//int i = blockIdx.x * (blockDim.x) + tid;
-	//sdata[tid] = array[i] ;
-	//__syncthreads();
+	int i = blockIdx.x * (blockDim.x) + tid;
+	sdata[tid] = array[i] ;
+	__syncthreads();
 	
 	
-	//printf("%d;%d\n", array[tid], tid);
+	//SINGLE BLOCK SLOW
+	///*
 	for ( unsigned int s = 1; s < blockDim.x; s *= 2 ){
 		if ( tid % ( 2 * s  ) == 0  ){
-			if ( tid + s < blockDim.x ){
-				array[tid] = ( (array[tid]  % mod  ) * (array[ tid + s ] % mod ) )% mod;
-}
+			if (tid + s < blockDim.x){
+				sdata[tid] = ( (sdata[tid]  % mod  ) * (sdata[ tid + s ] % mod ) )% mod;
+			}
 		}
 		__syncthreads();
-		//printf("%d;%d\n", array[tid], tid);
 	}
-
+	//*/
+	
+	//SINGLE BLOCK MEDIUM
 	/*
-	for (int s = blockDim.x/2; s > 0; s >>= 1)
-	{
-		if (tid < s)
-		{
-			sdata[tid] = (sdata[tid] * sdata[tid + s]) % mod;
+	for (int s = 1; s < blockDim.x ; s *= 2){
+		int index = 2 * s * tid;
+		if ( index  + s< blockDim.x  ){
+			sdata[index] = ( (sdata[index]  % mod  ) * (sdata[ index + s ] % mod ) )% mod;
+
 		}
 		__syncthreads();
+
 	}
 	*/
+
 	if (tid == 0){
-		output[blockIdx.x] = array[0];
+		output[blockIdx.x] = sdata[0];
 	}
+}
+
+__global__ void sumCommMultiBlock(const int *gArr, int arraySize, int *gOut, int mod, int blockSize) {
+    int thIdx = threadIdx.x;
+    int gthIdx = thIdx + blockIdx.x*blockSize;
+    const int gridSize = blockSize*gridDim.x;
+    int sum = 1;
+    for (int i = gthIdx; i < arraySize; i += gridSize)
+        sum = ( ( sum % mod  ) *  (gArr[i] % mod ) ) % mod ;
+    __shared__ int shArr[1024];
+    shArr[thIdx] = sum;
+    __syncthreads();
+    for (int size = blockSize/2; size>0; size/=2) { //uniform
+        if (thIdx<size)
+		shArr[thIdx] = ( (shArr[thIdx]  % mod  ) * (shArr[ thIdx + size ] % mod ) )% mod;
+        __syncthreads();
+    }
+    if (thIdx == 0)
+        gOut[blockIdx.x] = shArr[0];
 }
 
 __global__ void init_reduction(int value, int *array, int n)
@@ -88,15 +110,12 @@ __global__ void rsa( int *num, int *key, int *den, unsigned int *result)
 		temp = mod( num[i], *key, *den);
 		atomicExch( &result[i], temp );
 	}
-
-			
-	
 }
 
 int main(){
 	int nsize = 5;
 	int num[5] = {104,101, 108, 108, 111};
-	int key = 12000;
+	int key = 4000;
 	int size = key / 2;
 	int den = 91 * 97;
 	int *d_num, *d_key, *d_den;
@@ -152,7 +171,8 @@ int main(){
 
 	init_reduction<<<num_blocks,num_threads>>>(base, input, size );
 
-	parallel_reduction<<<num_blocks,num_threads>>>(input, output, den);
+	parallel_reduction<<<num_blocks,num_threads,size * sizeof(int)>>>(input, output, den);
+	//sumCommMultiBlock<<<num_blocks,num_threads>>>(input,size,output,den,num_blocks);
 	
 	cudaEventRecord(stop_p, 0);
 	cudaEventSynchronize(stop_p);
