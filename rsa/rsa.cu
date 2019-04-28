@@ -75,22 +75,22 @@ __global__ void parallel_reduction(int *array, int *output, int mod)
 }
 
 __global__ void sumCommMultiBlock(const int *gArr, int arraySize, int *gOut, int mod, int blockSize) {
-    int thIdx = threadIdx.x;
-    int gthIdx = thIdx + blockIdx.x*blockSize;
-    const int gridSize = blockSize*gridDim.x;
-    int sum = 1;
-    for (int i = gthIdx; i < arraySize; i += gridSize)
-        sum = ( ( sum % mod  ) *  (gArr[i] % mod ) ) % mod ;
-    __shared__ int shArr[1024];
-    shArr[thIdx] = sum;
-    __syncthreads();
-    for (int size = blockSize/2; size>0; size/=2) { //uniform
-        if (thIdx<size)
-		shArr[thIdx] = ( (shArr[thIdx]  % mod  ) * (shArr[ thIdx + size ] % mod ) )% mod;
-        __syncthreads();
-    }
-    if (thIdx == 0)
-        gOut[blockIdx.x] = shArr[0];
+	int thIdx = threadIdx.x;
+	int gthIdx = thIdx + blockIdx.x*blockSize;
+	const int gridSize = blockSize*gridDim.x;
+	int sum = 1;
+	for (int i = gthIdx; i < arraySize; i += gridSize)
+	sum = ( ( sum % mod  ) *  (gArr[i] % mod ) ) % mod ;
+	__shared__ int shArr[1024];
+	shArr[thIdx] = sum;
+	__syncthreads();
+	for (int size = blockSize/2; size>0; size/=2) { //uniform
+	if (thIdx<size)
+	shArr[thIdx] = ( (shArr[thIdx]  % mod  ) * (shArr[ thIdx + size ] % mod ) )% mod;
+	__syncthreads();
+	}
+	if (thIdx == 0)
+	gOut[blockIdx.x] = shArr[0];
 }
 
 __global__ void init_reduction(int value, int *array, int n)
@@ -171,8 +171,8 @@ int main(){
 
 	init_reduction<<<num_blocks,num_threads>>>(base, input, size );
 
-	parallel_reduction<<<num_blocks,num_threads,size * sizeof(int)>>>(input, output, den);
-	//sumCommMultiBlock<<<num_blocks,num_threads>>>(input,size,output,den,num_blocks);
+	//parallel_reduction<<<num_blocks,num_threads,size * sizeof(int)>>>(input, output, den);
+	sumCommMultiBlock<<<num_blocks,num_threads>>>(input,size,output,den,num_blocks);
 	
 	cudaEventRecord(stop_p, 0);
 	cudaEventSynchronize(stop_p);
