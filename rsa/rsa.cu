@@ -96,7 +96,7 @@ __global__ void rsa( int *num, int *key, int *den, unsigned int *result)
 int main(){
 	int nsize = 5;
 	int num[5] = {104,101, 108, 108, 111};
-	int key = 12000;
+	int key = 20000;
 	int size = key / 2;
 	int den = 91 * 97;
 	int *d_num, *d_key, *d_den;
@@ -154,6 +154,12 @@ int main(){
 
 	parallel_reduction<<<num_blocks,num_threads>>>(input, output, den);
 	
+	cudaMemcpy( ans, output, size * sizeof(int), cudaMemcpyDeviceToHost);
+	int final_ans = ans[0];
+	for (int i = 1;i < num_blocks;i++){
+		final_ans = ( (final_ans % den) * (ans[i] % den ) ) % den;
+	}
+	
 	cudaEventRecord(stop_p, 0);
 	cudaEventSynchronize(stop_p);
 	cudaEventElapsedTime(&new_time, start_p, stop_p);
@@ -166,13 +172,7 @@ int main(){
 	
 	cudaDeviceSynchronize();
 
-	cudaMemcpy( ans, output, size * sizeof(int), cudaMemcpyDeviceToHost);
-	
-	int final_ans = ans[0];
-	for (int i = 1;i < num_blocks;i++){
-		final_ans = ( (final_ans % den) * (ans[i] % den ) ) % den;
-	}
-	
+
 	printf("%d -  %d\n", final_ans, res[0] );
 	cudaFree(d_num);
 	cudaFree(d_key);
